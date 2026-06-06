@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DEX — Neural Evolution Dashboard</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: #0a0a0f;
+  color: #c0c0d0;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+header {
+  background: linear-gradient(135deg, #0d0d1a, #1a0a2e);
+  border-bottom: 1px solid #2a1a4e;
+  padding: 1rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+header h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  background: linear-gradient(90deg, #a855f7, #6366f1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.status { display: flex; gap: 1.5rem; font-size: 0.85rem; }
+.status span { opacity: 0.7; }
+.status strong { opacity: 1; color: #a855f7; }
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  padding: 1rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+.card {
+  background: #111118;
+  border: 1px solid #1e1e2e;
+  border-radius: 12px;
+  padding: 1rem;
+}
+.card h2 { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; color: #6b6b80; margin-bottom: 0.75rem; }
+.card-full { grid-column: 1 / -1; }
+#brain-viz { width: 100%; height: 400px; }
+#brain-viz svg { width: 100%; height: 100%; }
+.neuron { fill: #6366f1; stroke: #818cf8; stroke-width: 1.5; transition: r 0.3s; }
+.neuron.active { fill: #a855f7; stroke: #c084fc; }
+.connection { stroke: #1e1e3e; stroke-width: 0.5; }
+.connection.active { stroke: #a855f7; stroke-opacity: 0.3; }
+#skill-tree { font-size: 0.85rem; }
+#skill-tree li { padding: 0.25rem 0; list-style: none; }
+#skill-tree li::before { content: '◆ '; color: #6366f1; }
+.skill-bar { display: inline-block; height: 6px; border-radius: 3px; margin-left: 0.5rem; }
+.chat-box { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+.chat-box input {
+  flex: 1;
+  background: #0a0a0f;
+  border: 1px solid #1e1e2e;
+  border-radius: 8px;
+  padding: 0.6rem 1rem;
+  color: #c0c0d0;
+  font-size: 0.9rem;
+}
+.chat-box input:focus { outline: none; border-color: #6366f1; }
+.chat-box button {
+  background: #6366f1;
+  border: none;
+  border-radius: 8px;
+  padding: 0.6rem 1.2rem;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
+.chat-box button:hover { background: #818cf8; }
+#chat-response {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: #0a0a0f;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  min-height: 2.5rem;
+  font-style: italic;
+}
+.log-entry {
+  padding: 0.4rem 0;
+  border-bottom: 1px solid #1a1a2a;
+  font-size: 0.85rem;
+  display: flex;
+  justify-content: space-between;
+}
+.log-entry:last-child { border-bottom: none; }
+canvas { max-height: 150px; }
+@media (max-width: 768px) {
+  .grid { grid-template-columns: 1fr; }
+  header { flex-direction: column; gap: 0.5rem; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>DEX — Neural Evolution</h1>
+  <div class="status">
+    <span>Gen: <strong id="gen">0</strong></span>
+    <span>Neurons: <strong id="neurons">0</strong></span>
+    <span>Fitness: <strong id="fitness">0</strong></span>
+    <span>Difficulty: <strong id="diff">0</strong></span>
+    <span>Skills: <strong id="skills-count">0</strong></span>
+  </div>
+</header>
+
+<div class="grid">
+  <div class="card card-full">
+    <h2>Brain Activity</h2>
+    <div id="brain-viz"></div>
+  </div>
+
+  <div class="card">
+    <h2>Discovered Skills</h2>
+    <div id="skill-tree"><em>Watching for emergence...</em></div>
+  </div>
+
+  <div class="card">
+    <h2>Today's Log</h2>
+    <div id="daily-log"><em>Loading...</em></div>
+  </div>
+
+  <div class="card">
+    <h2>Fitness / Error</h2>
+    <canvas id="metrics-chart"></canvas>
+  </div>
+
+  <div class="card">
+    <h2>Chat with DEX</h2>
+    <div class="chat-box">
+      <input id="chat-input" placeholder="Say something to DEX..." />
+      <button id="chat-send">Send</button>
+    </div>
+    <div id="chat-response">DEX is evolving. He'll be ready to talk soon.</div>
+  </div>
+</div>
+
+<script>
+const API = '';
+let state = {};
+let skills = {};
+let sim;
+
+function updateStatus(s) {
+  document.getElementById('gen').textContent = s.generation ?? 0;
+  document.getElementById('neurons').textContent = s.neuron_count ?? 0;
+  document.getElementById('fitness').textContent = s.fitness ?? 0;
+  document.getElementById('diff').textContent = s.curriculum_difficulty ?? 0;
+}
+
+async function fetchState() {
+  try {
+    const r = await fetch(`${API}/api/brain/state`);
+    state = await r.json();
+    updateStatus(state);
+  } catch {}
+}
+
+async function fetchSkills() {
+  try {
+    const r = await fetch(`${API}/api/skills/tree`);
+    const data = await r.json();
+    skills = data.skills ?? [];
+    document.getElementById('skills-count').textContent = skills.length;
+    const el = document.getElementById('skill-tree');
+    if (skills.length === 0) {
+      el.innerHTML = '<em>Watching for emergence...</em>';
+      return;
+    }
+    el.innerHTML = skills.map(s =>
+      `<li>${s.name} <span style="opacity:0.5">(${s.neuron_count} neurons)</span>
+        <span class="skill-bar" style="width:${Math.round(s.strength * 80)}px;background:hsl(${280 + s.strength * 60},70%,60%)"></span>
+        <span style="opacity:0.4;font-size:0.75rem">acc: ${s.accuracy}</span></li>`
+    ).join('');
+  } catch {}
+}
+
+async function fetchLogs() {
+  try {
+    const r = await fetch(`${API}/api/logs/today`);
+    const data = await r.json();
+    const el = document.getElementById('daily-log');
+    if (data.new_skills?.length) {
+      el.innerHTML = data.new_skills.map(s =>
+        `<div class="log-entry"><span>✦ New skill: ${s}</span><span style="opacity:0.4">today</span></div>`
+      ).join('');
+    } else {
+      el.innerHTML = '<div class="log-entry"><span>DEX is evolving quietly...</span></div>';
+    }
+  } catch {}
+}
+
+async function fetchMetrics() {
+  try {
+    const r = await fetch(`${API}/api/logs/metrics`);
+    const data = await r.json();
+    const ctx = document.getElementById('metrics-chart').getContext('2d');
+    if (window._chart) window._chart.destroy();
+    if (data.fitness?.length) {
+      window._chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: data.fitness.map((_, i) => i),
+          datasets: [
+            { label: 'Fitness', data: data.fitness, borderColor: '#6366f1', backgroundColor: 'transparent', tension: 0.3, pointRadius: 0 },
+            { label: 'Error', data: data.errors, borderColor: '#ef4444', backgroundColor: 'transparent', tension: 0.3, pointRadius: 0 },
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: '#6b6b80', boxWidth: 8 } } },
+          scales: { x: { display: false }, y: { grid: { color: '#1a1a2a' }, ticks: { color: '#6b6b80' } } }
+        }
+      });
+    }
+  } catch {}
+}
+
+function renderBrain() {
+  const container = document.getElementById('brain-viz');
+  container.innerHTML = '';
+  const svg = d3.select(container)
+    .append('svg')
+    .attr('viewBox', '-200 -200 400 400');
+
+  if (!state.neuron_count || state.neuron_count < 2) {
+    svg.append('text')
+      .attr('x', 0).attr('y', 0)
+      .attr('text-anchor', 'middle').attr('fill', '#6b6b80')
+      .text('DEX brain is forming...');
+    return;
+  }
+
+  const n = Math.min(state.neuron_count, 60);
+  const nodes = d3.range(n).map(i => ({
+    id: i,
+    act: state.activations?.[i] ?? 'relu',
+    r: 4 + Math.random() * 3,
+  }));
+
+  const links = [];
+  const adj = state.adjacency ?? [];
+  for (let i = 0; i < Math.min(adj.length, n); i++) {
+    for (let j = 0; j < Math.min(adj[i]?.length ?? 0, n); j++) {
+      if (Math.abs(adj[i][j]) > 0.01) {
+        links.push({ source: i, target: j, weight: Math.abs(adj[i][j]) });
+      }
+    }
+  }
+
+  sim = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(links).distance(40).strength(l => l.weight * 2))
+    .force('charge', d3.forceManyBody().strength(-60))
+    .force('center', d3.forceCenter(0, 0))
+    .on('tick', ticked);
+
+  const link = svg.append('g')
+    .selectAll('line')
+    .data(links)
+    .join('line')
+    .attr('class', 'connection')
+    .attr('stroke-width', l => Math.max(0.3, l.weight * 2));
+
+  const node = svg.append('g')
+    .selectAll('circle')
+    .data(nodes)
+    .join('circle')
+    .attr('class', d => `neuron ${d.act === 'relu' ? 'active' : ''}`)
+    .attr('r', d => d.r);
+
+  function ticked() {
+    link
+      .attr('x1', d => d.source.x)
+      .attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x)
+      .attr('y2', d => d.target.y);
+    node
+      .attr('cx', d => d.x)
+      .attr('cy', d => d.y);
+  }
+}
+
+async function chat(message) {
+  try {
+    const r = await fetch(`${API}/api/chat/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message }),
+    });
+    const data = await r.json();
+    document.getElementById('chat-response').textContent =
+      data.response ?? 'DEX is thinking...';
+  } catch {
+    document.getElementById('chat-response').textContent =
+      'DEX is still evolving. Try again later.';
+  }
+}
+
+function poll() {
+  Promise.all([fetchState(), fetchSkills(), fetchLogs(), fetchMetrics()])
+    .then(() => renderBrain());
+}
+
+document.getElementById('chat-send').addEventListener('click', () => {
+  const input = document.getElementById('chat-input');
+  if (input.value.trim()) chat(input.value.trim());
+});
+document.getElementById('chat-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('chat-send').click();
+});
+
+poll();
+setInterval(poll, 3000);
+</script>
+</body>
+</html>
