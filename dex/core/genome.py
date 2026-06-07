@@ -37,7 +37,7 @@ def bootstrap_genome(rng: np.random.Generator) -> 'Genome':
         for j in range(hidden):
             adj[j, i] = rng.standard_normal() * 0.5
 
-    acts = ['relu'] * n
+    acts = [rng.choice(['relu', 'tanh', 'sigmoid', 'identity', 'swish']) for _ in range(n)]
     innovs = [next_innovation_id() for _ in range(n)]
     biases = np.zeros(n, dtype=np.float32)
     biases[-1] = 0.1  # small positive bias on output neuron
