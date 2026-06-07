@@ -12,6 +12,7 @@ class DAGNetwork:
         g = self.genome
         from .activations import apply
         total = g.adjacency.T @ state + g.biases
+        total = np.nan_to_num(total, nan=0.0, posinf=3.0, neginf=-3.0)
         for i in range(g.neuron_count):
             state[i] = apply(g.activations[i], float(total[i]))
         if input_clamp is not None:
@@ -40,9 +41,6 @@ class DAGNetwork:
         return state[-1:], state
 
     def hebbian_learn(self, inputs: list[np.ndarray], rng: np.random.Generator, lr: float | None = None):
-        """Vectorized Oja's rule: ΔW = η * (aaᵀ - W ⊙ (a² ⊗ 1ⁿ))
-        Learns from a fraction of the batch for speed.
-        """
         g = self.genome
         n = g.neuron_count
         eta = lr if lr is not None else g.learning_rate
@@ -56,13 +54,18 @@ class DAGNetwork:
         if acts.ndim != 2 or acts.shape[0] < 2:
             return
 
+        acts = np.nan_to_num(acts, nan=0.0)
         a = np.mean(acts, axis=0)
+        if np.all(np.abs(a) < 1e-8):
+            return
         outer_aa = np.outer(a, a)
         decay = g.adjacency * np.outer(a ** 2, np.ones(n))
         delta = eta * (outer_aa - decay)
+        delta = np.nan_to_num(delta, nan=0.0, posinf=0.1, neginf=-0.1)
         np.fill_diagonal(delta, 0)
         g.adjacency += delta.astype(np.float32)
         np.clip(g.adjacency, -3.0, 3.0, out=g.adjacency)
+        g.adjacency = np.nan_to_num(g.adjacency, nan=0.0)
 
     def mutate(self, rng: np.random.Generator) -> 'DAGNetwork':
         new_g = Genome(
@@ -97,6 +100,9 @@ class DAGNetwork:
             self._grow_neuron(new_g, rng)
         if rng.random() < mr * 0.15 and new_g.neuron_count > MIN_NEURONS:
             self._prune_neuron(new_g, rng, force=False)
+
+        new_g.adjacency = np.nan_to_num(new_g.adjacency, nan=0.0)
+        new_g.biases = np.nan_to_num(new_g.biases, nan=0.0)
 
         new_g.learning_rate *= 1 + rng.standard_normal() * mr * 0.1
         new_g.learning_rate = float(np.clip(new_g.learning_rate, 1e-5, 0.1))

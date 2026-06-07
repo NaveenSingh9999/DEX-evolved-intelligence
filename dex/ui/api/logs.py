@@ -1,6 +1,11 @@
+import math
 from fastapi import APIRouter
 
 router = APIRouter(prefix='/api/logs', tags=['logs'])
+
+
+def _sanitize(val, default=0.0):
+    return default if math.isnan(val) or math.isinf(val) else val
 
 
 @router.get('/today')
@@ -25,7 +30,7 @@ async def get_metrics():
     if DEX is None:
         return {'fitness': [], 'errors': []}
     return {
-        'fitness': DEX.pipeline.fitness_log[-200:],
-        'errors': DEX.pipeline.error_log[-200:],
+        'fitness': [_sanitize(f) for f in DEX.pipeline.fitness_log[-200:]],
+        'errors': [_sanitize(e) for e in DEX.pipeline.error_log[-200:]],
         'total_steps': DEX.pipeline.total_steps,
     }
