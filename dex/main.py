@@ -85,7 +85,7 @@ class DEX:
 
     def train_step(self):
         _throttle_if_needed()
-        self.pipeline.step(iterations=5)
+        self.pipeline.step(iterations=2)
         state = self.pipeline.get_state()
 
         if self.pipeline.best_net:
@@ -136,7 +136,7 @@ class DEX:
 
 def main():
     parser = argparse.ArgumentParser(description='DEX — Self-Evolving Neural Network')
-    parser.add_argument('--pop-size', type=int, default=20, help='Population size')
+    parser.add_argument('--pop-size', type=int, default=10, help='Population size')
     parser.add_argument('--seed', type=int, default=None, help='Random seed')
     parser.add_argument('--ui', action='store_true', default=True, help='Launch dashboard')
     parser.add_argument('--port', type=int, default=3000, help='Dashboard port')
@@ -153,7 +153,7 @@ def main():
     global pop_size
     pop_size = args.pop_size
 
-    dex = DEX(pop_size=args.pop_size, seed=args.seed)
+    dex = DEX(pop_size=min(args.pop_size, 10), seed=args.seed)
     dex.initialize()
 
     import dex as dex_module
