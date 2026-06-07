@@ -32,22 +32,12 @@ class TrainingPipeline:
             for net in self.evolver.population:
                 lr = net.genome.learning_rate
                 for _ in range(self.gd_steps_per_gen):
-                    total_loss = 0.0
-                    count = 0
                     for x, y in zip(inputs[:8], targets[:8]):
                         yt = y[:1] if isinstance(y, np.ndarray) else np.array([y], dtype=np.float32)
                         net.forward_and_cache(x)
                         loss = net.backward(yt, lr=lr)
-                        if not (np.isnan(loss) or np.isinf(loss)):
-                            total_loss += loss
-                            count += 1
-                        else:
-                            # reset weights to last known good state
+                        if np.isnan(loss) or np.isinf(loss):
                             break
-                    if count > 0:
-                        pass
-                # Decay LR slightly each generation to stabilize
-                net.genome.learning_rate *= 0.995
 
             # ── 2. Generational memory replay ──
             if gen - self.last_replay_gen >= 5 and len(self.memory.buffer) >= 16:
@@ -97,10 +87,17 @@ class TrainingPipeline:
                 self.best_fitness = fitnesses[best_idx]
                 self.best_net = self.evolver.population[best_idx]
 
-            avg_err = float(np.mean([1.0 / (1.0 + f) for f in fitnesses]))
-            self.error_log.append(avg_err)
+            actual_mses = []
+            for net in self.evolver.population:
+                errs = []
+                for x, y in zip(inputs, targets):
+                    pred = net.forward(x)
+                    errs.append(float(np.mean((pred - y) ** 2)))
+                actual_mses.append(float(np.mean(errs)))
+            avg_mse = float(np.mean(actual_mses))
+            self.error_log.append(avg_mse)
             self.fitness_log.append(avg_fit)
-            self.curriculum.update_difficulty(avg_err)
+            self.curriculum.update_difficulty(avg_mse)
 
             # ── 5. Evolve architecture (GA) ──
             self.evolver.evolve(fitnesses)

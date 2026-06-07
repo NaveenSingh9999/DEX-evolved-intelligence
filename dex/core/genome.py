@@ -28,7 +28,7 @@ def bootstrap_genome(rng: np.random.Generator) -> 'Genome':
     adj = np.zeros((n, n), dtype=np.float32)
     hidden = 8
     out = 1
-    # input -> hidden (scale for unity gain through network)
+    # input -> hidden
     for i in range(hidden):
         for j in range(n - hidden - out):
             adj[j, i] = rng.standard_normal() * 0.5
@@ -37,17 +37,23 @@ def bootstrap_genome(rng: np.random.Generator) -> 'Genome':
         for j in range(hidden):
             adj[j, i] = rng.standard_normal() * 0.5
 
+    # hidden -> hidden recurrent connections (dense enough for signal flow)
+    for i in range(hidden):
+        for j in range(hidden):
+            if rng.random() < 0.3:
+                adj[j, i] = rng.standard_normal() * 0.3
     acts = [rng.choice(['relu', 'tanh', 'sigmoid', 'identity', 'swish']) for _ in range(n)]
+    acts[-1] = 'sigmoid'  # output [0,1], derivative always >0, matches char range
     innovs = [next_innovation_id() for _ in range(n)]
     biases = np.zeros(n, dtype=np.float32)
-    biases[-1] = 0.1  # small positive bias on output neuron
+    biases[-1] = 0.0  # output starts neutral
     return Genome(
         neuron_count=n,
         adjacency=adj,
         activations=acts,
         innovations=innovs,
         biases=biases,
-        learning_rate=float(rng.uniform(0.001, 0.01)),
+        learning_rate=float(rng.uniform(0.001, 0.02)),
         mutation_rate=float(rng.uniform(0.01, 0.3)),
     )
 

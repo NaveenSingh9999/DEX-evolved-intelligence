@@ -30,7 +30,7 @@ class DAGNetwork:
         state = np.zeros(n, dtype=np.float32)
         inp_clamp = x.ravel()[:n].copy()
         state[:len(inp_clamp)] = inp_clamp
-        steps = min(20, n)
+        steps = min(8, n)
         if store:
             self._cache = {'steps': steps, 'totals': [], 'states': [state.copy()], 'input_dim': x.shape[-1]}
         for _ in range(steps):
@@ -104,8 +104,8 @@ class DAGNetwork:
                 d_state = np.nan_to_num(d_state, nan=0.0, posinf=0.0, neginf=0.0)
                 d_state[:n_inputs] = 0.0
 
-        if grad_norm > 1.0:
-            scale = 1.0 / float(np.sqrt(grad_norm))
+        if grad_norm > 100.0:
+            scale = 10.0 / float(np.sqrt(grad_norm))
             adj_grad *= scale
             bias_grad *= scale
 
