@@ -47,7 +47,7 @@ def bootstrap_genome(rng: np.random.Generator) -> 'Genome':
         activations=acts,
         innovations=innovs,
         biases=biases,
-        learning_rate=float(rng.uniform(0.001, 0.05)),
+        learning_rate=float(rng.uniform(0.001, 0.01)),
         mutation_rate=float(rng.uniform(0.01, 0.3)),
     )
 

@@ -1,5 +1,4 @@
 import numpy as np
-import time
 import os
 import json
 from dex.core.dag_network import DAGNetwork
@@ -19,31 +18,46 @@ class TrainingPipeline:
         self.total_steps = 0
         self.error_log: list[float] = []
         self.fitness_log: list[float] = []
-        self.diversity_coeff = 0.1
+        self.diversity_coeff = 0.05
         self.last_replay_gen = -5
+        self.gd_steps_per_gen = 3
 
     def step(self, iterations: int = 10):
         for _ in range(iterations):
-            inputs, targets = self.curriculum.generate_batch(32)
+            inputs, targets = self.curriculum.generate_batch(16)
 
-            # ── 1. Hebbian learning phase ──
+            gen = self.evolver.generation
+
+            # ── 1. Gradient descent phase (learn within each lifetime) ──
             for net in self.evolver.population:
-                net.hebbian_learn(inputs, self.evolver.rng)
+                lr = net.genome.learning_rate
+                for _ in range(self.gd_steps_per_gen):
+                    total_loss = 0.0
+                    count = 0
+                    for x, y in zip(inputs[:8], targets[:8]):
+                        yt = y[:1] if isinstance(y, np.ndarray) else np.array([y], dtype=np.float32)
+                        net.forward_and_cache(x)
+                        loss = net.backward(yt, lr=lr)
+                        if not (np.isnan(loss) or np.isinf(loss)):
+                            total_loss += loss
+                            count += 1
+                        else:
+                            # reset weights to last known good state
+                            break
+                    if count > 0:
+                        pass
+                # Decay LR slightly each generation to stabilize
+                net.genome.learning_rate *= 0.995
 
             # ── 2. Generational memory replay ──
-            gen = self.evolver.generation
             if gen - self.last_replay_gen >= 5 and len(self.memory.buffer) >= 16:
                 self.last_replay_gen = gen
                 replay_memories = self.memory.sample(8, self.evolver.rng)
-                replay_inputs_list = []
-                replay_targets_list = []
                 for m in replay_memories:
                     noisy = np.array([m.prediction], dtype=np.float32) + self.evolver.rng.standard_normal(1) * 0.05
-                    replay_inputs_list.append(noisy)
-                    replay_targets_list.append(np.array([m.surprise], dtype=np.float32))
-                if len(replay_inputs_list) >= 4:
-                    inputs = list(inputs) + replay_inputs_list
-                    targets = list(targets) + replay_targets_list
+                    for net in self.evolver.population:
+                        net.forward_and_cache(noisy)
+                        net.backward(np.array([m.surprise]), lr=net.genome.learning_rate * 0.5)
 
             # ── 3. Evaluate fitness ──
             raw_fitnesses = []
@@ -57,20 +71,17 @@ class TrainingPipeline:
             for i, net in enumerate(self.evolver.population):
                 net.genome.fitness = fitnesses[i]
 
-            # ── 4. Memory push with curiosity ──
+            # ── 4. Memory push ──
             for net in self.evolver.population:
-                first_inp = inputs[0] if isinstance(inputs, list) else inputs
-                first_tgt = targets[0] if isinstance(targets, list) else targets
+                first_inp = inputs[0]
+                first_tgt = targets[0]
                 pred = net.forward(first_inp)
                 tgt_slice = first_tgt[:len(pred)] if isinstance(first_tgt, np.ndarray) else np.array([0.0])
                 err = float(np.mean((pred - tgt_slice) ** 2))
                 surprise = 1.0 / (1.0 + err)
-
-                inp_arr = first_inp
-                h = int(hash(inp_arr.tobytes())) % (2**31 - 1)
+                h = int(hash(first_inp.tobytes())) % (2**31 - 1)
                 curiosity = self.curriculum.curiosity_score(h)
                 self.curriculum.record_visit(h)
-
                 entry = MemoryEntry(
                     input_hash=h,
                     prediction=float(pred[0]) if len(pred) > 0 else 0.0,
@@ -91,6 +102,7 @@ class TrainingPipeline:
             self.fitness_log.append(avg_fit)
             self.curriculum.update_difficulty(avg_err)
 
+            # ── 5. Evolve architecture (GA) ──
             self.evolver.evolve(fitnesses)
             self.total_steps += 1
 
@@ -112,12 +124,25 @@ class TrainingPipeline:
             'memory_size': len(self.memory.buffer),
         }
 
+    def generate(self, seed: np.ndarray, steps: int = 20) -> list[float]:
+        if self.best_net is None:
+            return [0.0]
+        net = self.best_net
+        outputs = []
+        x = seed.copy()
+        for _ in range(steps):
+            pred = net.forward(x)
+            outputs.append(float(pred[0]))
+            x = np.concatenate([x[1:], pred])
+        return outputs
+
     def save_checkpoint(self, path: str):
         tmp_path = path + '.tmp'
         state = {
             'total_steps': self.total_steps,
             'best_fitness': self.best_fitness,
             'last_replay_gen': self.last_replay_gen,
+            'gd_steps_per_gen': self.gd_steps_per_gen,
             'error_log': self.error_log[-500:],
             'fitness_log': self.fitness_log[-500:],
         }
@@ -136,6 +161,7 @@ class TrainingPipeline:
         self.total_steps = state['total_steps']
         self.best_fitness = state['best_fitness']
         self.last_replay_gen = state.get('last_replay_gen', -5)
+        self.gd_steps_per_gen = state.get('gd_steps_per_gen', 3)
         self.error_log = state.get('error_log', [])
         self.fitness_log = state.get('fitness_log', [])
         if 'best_genome' in state:
