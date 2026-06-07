@@ -7,26 +7,26 @@ _CHARS = ' abcdefghijklmnopqrstuvwxyz,.!\'?;:-'
 _CHAR_MAP = {c: i / (len(_CHARS) - 1) for i, c in enumerate(_CHARS)}
 _CHAR_KEYS = list(_CHAR_MAP.keys())
 
-_BOOK_PATH = 'data/text/alice.txt'
+_BOOK_PATHS = ['data/text/alice.txt', 'data/text/hawking.txt']
 
 
-def _load_book_sentences(path: str) -> list[str]:
-    if not os.path.exists(path):
-        return _TEXTS
-    with open(path, encoding='utf-8', errors='ignore') as f:
-        raw = f.read()
-    sentences = []
-    for line in raw.split('\n'):
-        line = line.strip().lower()
-        if not line or line.startswith('[') or line.startswith('*'):
+def _load_book_sentences(paths: list[str]) -> list[str]:
+    all_sentences = []
+    for path in paths:
+        if not os.path.exists(path):
             continue
-        # Keep only printable chars in our map
-        filtered = ''.join(c for c in line if c in _CHAR_MAP)
-        if len(filtered) >= 10:
-            sentences.append(filtered)
-    if not sentences:
-        return _TEXTS
-    return sentences
+        with open(path, encoding='utf-8', errors='ignore') as f:
+            raw = f.read()
+        for line in raw.split('\n'):
+            line = line.strip().lower()
+            if not line or line.startswith('[') or line.startswith('*'):
+                continue
+            filtered = ''.join(c for c in line if c in _CHAR_MAP)
+            if len(filtered) >= 10:
+                all_sentences.append(filtered)
+    if not all_sentences:
+        all_sentences = ['the neural network learns from data']
+    return all_sentences
 
 
 def _text_to_sequence(text: str, length: int) -> np.ndarray:
@@ -44,7 +44,7 @@ class Curriculum:
         self.input_visit_count: dict[int, int] = defaultdict(int)
         self.decay_rate = 0.05
         self.min_exploration = 0.2
-        self.sentences = _load_book_sentences(_BOOK_PATH)
+        self.sentences = _load_book_sentences(_BOOK_PATHS)
         self.text_pos = 0
 
     def generate_batch(self, batch_size: int = 16) -> tuple[list, list]:
