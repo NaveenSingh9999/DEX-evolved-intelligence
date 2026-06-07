@@ -75,6 +75,7 @@ class GeneticEvolver:
 
         child_n = len(child_innovs)
         child_adj = np.zeros((child_n, child_n), dtype=np.float32)
+        child_biases = np.zeros(child_n, dtype=np.float32)
         for i, innov_i in enumerate(child_innovs):
             for j, innov_j in enumerate(child_innovs):
                 w = None
@@ -85,12 +86,17 @@ class GeneticEvolver:
                     w = w2 if w is None else (w + w2) / 2
                 if w is not None and abs(w) > 1e-8:
                     child_adj[i, j] = w
+            # bias crossover
+            b1 = g1.biases[map1[innov_i]] if innov_i in map1 else 0.0
+            b2 = g2.biases[map2[innov_i]] if innov_i in map2 else 0.0
+            child_biases[i] = (b1 + b2) / 2 if (innov_i in map1 and innov_i in map2) else (b1 if innov_i in map1 else b2)
 
         child_g = Genome(
             neuron_count=child_n,
             adjacency=child_adj,
             activations=child_acts,
             innovations=child_innovs,
+            biases=child_biases,
             learning_rate=(g1.learning_rate + g2.learning_rate) / 2,
             mutation_rate=(g1.mutation_rate + g2.mutation_rate) / 2,
             dirichlet_weights=(g1.dirichlet_weights + g2.dirichlet_weights) / 2,

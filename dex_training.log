@@ -1,0 +1,57 @@
+INFO:     Started server process [10672]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:3000 (Press CTRL+C to quit)
+ Spawning initial population (bootstrapped 3-layer MLPs)...
+   Population: 20 genomes
+ DEX is alive. Evolution begins.
+
+ Dashboard at http://localhost:3000
+INFO:     127.0.0.1:56978 - "GET / HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:56978 - "GET /api/brain/state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56982 - "GET /api/skills/tree HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56986 - "GET /api/logs/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56990 - "GET /api/logs/metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56990 - "GET /api/brain/state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56986 - "GET /api/skills/tree HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56982 - "GET /api/logs/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56978 - "GET /api/logs/metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56996 - "GET /api/brain/state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56978 - "GET /api/brain/state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56982 - "GET /api/skills/tree HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56986 - "GET /api/logs/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56990 - "GET /api/logs/metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56990 - "GET /api/brain/state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56986 - "GET /api/skills/tree HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56982 - "GET /api/logs/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56978 - "GET /api/logs/metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56978 - "GET /api/brain/state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56982 - "GET /api/skills/tree HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56986 - "GET /api/logs/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56990 - "GET /api/logs/metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56990 - "GET /api/brain/state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56986 - "GET /api/skills/tree HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56982 - "GET /api/logs/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56978 - "GET /api/logs/metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57050 - "GET /api/brain/state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57050 - "GET /api/logs/metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57054 - "GET /api/skills/tree HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57058 - "GET /api/logs/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57058 - "GET /api/brain/state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57054 - "GET /api/skills/tree HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57050 - "GET /api/logs/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57066 - "GET /api/logs/metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57066 - "GET /api/brain/state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57050 - "GET /api/skills/tree HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57054 - "GET /api/logs/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57058 - "GET /api/logs/metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57058 - "GET /api/brain/state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57054 - "GET /api/skills/tree HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57050 - "GET /api/logs/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57066 - "GET /api/logs/metrics HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [10672]
+
+ Shutting down DEX...

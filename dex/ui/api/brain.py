@@ -22,11 +22,11 @@ async def get_brain_state():
     if net is None:
         return {'neuron_count': 0, 'activations': [], 'adjacency': [], 'fitness': 0, 'generation': 0, 'learning_rate': 0}
     g = net.genome
-    return BrainState(
-        neuron_count=g.neuron_count,
-        activations=g.activations,
-        adjacency=g.adjacency.tolist(),
-        fitness=round(g.fitness, 4),
-        generation=DEX.pipeline.evolver.generation,
-        learning_rate=round(g.learning_rate, 6),
-    ).model_dump()
+    return {
+        'neuron_count': g.neuron_count,
+        'activations': g.activations,
+        'adjacency': g.adjacency.tolist(),
+        'fitness': round(g.fitness, 4),
+        'generation': DEX.pipeline.evolver.generation,
+        'learning_rate': round(g.learning_rate, 6),
+    }

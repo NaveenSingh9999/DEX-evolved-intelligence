@@ -109,7 +109,7 @@ class DEX:
             print(f'  Gen {s["generation"]:>4} | Step {s["total_steps"]:>6} | '
                   f'Neurons {s["neuron_count"]:>3} | Innovs {s["innovations"]:>3} | '
                   f'Fitness {s["best_fitness"]:.4f} | Diff {s["curriculum_difficulty"]:.2f} | '
-                  f'Skills {discovered}')
+                  f'Skills {discovered}', flush=True)
 
     def _checkpoint(self):
         os.makedirs(CHECKPOINT_DIR, exist_ok=True)

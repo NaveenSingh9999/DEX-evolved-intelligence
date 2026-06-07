@@ -28,22 +28,25 @@ def bootstrap_genome(rng: np.random.Generator) -> 'Genome':
     adj = np.zeros((n, n), dtype=np.float32)
     hidden = 8
     out = 1
-    # input -> hidden
+    # input -> hidden (scale for unity gain through network)
     for i in range(hidden):
         for j in range(n - hidden - out):
-            adj[j, i] = rng.standard_normal() * 0.2
+            adj[j, i] = rng.standard_normal() * 0.5
     # hidden -> output
     for i in range(n - out, n):
         for j in range(hidden):
-            adj[j, i] = rng.standard_normal() * 0.2
+            adj[j, i] = rng.standard_normal() * 0.5
 
     acts = ['relu'] * n
     innovs = [next_innovation_id() for _ in range(n)]
+    biases = np.zeros(n, dtype=np.float32)
+    biases[-1] = 0.1  # small positive bias on output neuron
     return Genome(
         neuron_count=n,
         adjacency=adj,
         activations=acts,
         innovations=innovs,
+        biases=biases,
         learning_rate=float(rng.uniform(0.001, 0.05)),
         mutation_rate=float(rng.uniform(0.01, 0.3)),
     )
@@ -59,6 +62,7 @@ class Genome:
     adjacency: np.ndarray = field(default_factory=lambda: np.zeros((INIT_NEURONS, INIT_NEURONS), dtype=np.float32))
     activations: list = field(default_factory=lambda: ['relu'] * INIT_NEURONS)
     innovations: list = field(default_factory=lambda: [next_innovation_id() for _ in range(INIT_NEURONS)])
+    biases: np.ndarray = field(default_factory=lambda: np.zeros(INIT_NEURONS, dtype=np.float32))
     learning_rate: float = 0.01
     mutation_rate: float = 0.1
     age: int = 0
@@ -72,6 +76,8 @@ class Genome:
             self.activations = ['relu'] * self.neuron_count
         if len(self.innovations) != self.neuron_count:
             self.innovations = [next_innovation_id() for _ in range(self.neuron_count)]
+        if self.biases.shape != (self.neuron_count,):
+            self.biases = np.zeros(self.neuron_count, dtype=np.float32)
         if self.dirichlet_weights.shape != (4,):
             self.dirichlet_weights = np.array([0.4, 0.3, 0.2, 0.1], dtype=np.float32)
 
@@ -84,6 +90,7 @@ class Genome:
             'adjacency': self.adjacency.tolist(),
             'activations': self.activations,
             'innovations': self.innovations,
+            'biases': self.biases.tolist(),
             'learning_rate': self.learning_rate,
             'mutation_rate': self.mutation_rate,
             'age': self.age,
@@ -98,6 +105,7 @@ class Genome:
             adjacency=np.array(data['adjacency'], dtype=np.float32),
             activations=data['activations'],
             innovations=data['innovations'],
+            biases=np.array(data.get('biases', [0.0]*data['neuron_count']), dtype=np.float32),
             learning_rate=data['learning_rate'],
             mutation_rate=data['mutation_rate'],
             age=data['age'],

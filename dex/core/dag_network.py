@@ -8,82 +8,61 @@ class DAGNetwork:
         self.n = genome.neuron_count
         self.activation_trace: list[np.ndarray] = []
 
-    def forward(self, x: np.ndarray) -> np.ndarray:
+    def _update_state(self, state: np.ndarray, input_clamp: np.ndarray | None = None) -> np.ndarray:
+        g = self.genome
+        from .activations import apply
+        total = g.adjacency.T @ state + g.biases
+        for i in range(g.neuron_count):
+            state[i] = apply(g.activations[i], float(total[i]))
+        if input_clamp is not None:
+            state[:len(input_clamp)] = input_clamp
+        return state
+
+    def _run_to_equilibrium(self, x: np.ndarray) -> np.ndarray:
         g = self.genome
         n = g.neuron_count
-        adj = g.adjacency
-        from .activations import apply
-
         state = np.zeros(n, dtype=np.float32)
-        input_dim = x.shape[-1]
-        state[:input_dim] = x.ravel()[:n]
+        inp_clamp = x.ravel()[:n].copy()
+        state[:len(inp_clamp)] = inp_clamp
+        for _ in range(min(20, n)):
+            state = self._update_state(state.copy(), input_clamp=inp_clamp)
+        return state
 
-        for _ in range(n):
-            new_state = state.copy()
-            for i in range(n):
-                incoming = adj[:, i] * state
-                total = np.sum(incoming)
-                new_state[i] = apply(g.activations[i], total)
-            state = new_state
-
-        output = state[-1:] if n > 0 else np.array([0.0])
-        return output
+    def forward(self, x: np.ndarray) -> np.ndarray:
+        state = self._run_to_equilibrium(x)
+        return state[-1:] if len(state) > 0 else np.array([0.0])
 
     def forward_with_trace(self, x: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        g = self.genome
-        n = g.neuron_count
-        adj = g.adjacency
-        from .activations import apply
-
-        state = np.zeros(n, dtype=np.float32)
-        input_dim = x.shape[-1]
-        state[:input_dim] = x.ravel()[:n]
-
-        for _ in range(n):
-            new_state = state.copy()
-            for i in range(n):
-                incoming = adj[:, i] * state
-                total = np.sum(incoming)
-                new_state[i] = apply(g.activations[i], total)
-            state = new_state
-
+        state = self._run_to_equilibrium(x)
         self.activation_trace.append(state.copy())
         if len(self.activation_trace) > 2000:
             self.activation_trace.pop(0)
-
         return state[-1:], state
 
     def hebbian_learn(self, inputs: list[np.ndarray], rng: np.random.Generator, lr: float | None = None):
-        """Apply Oja's rule within a genome's lifetime so evolution selects for learnability.
-        Δw_ij = η * (post_i * pre_j - post_i² * w_ij)
+        """Vectorized Oja's rule: ΔW = η * (aaᵀ - W ⊙ (a² ⊗ 1ⁿ))
+        Learns from a fraction of the batch for speed.
         """
         g = self.genome
         n = g.neuron_count
-        eta = lr if lr is not None else g.learning_rate * 2.0
+        eta = lr if lr is not None else g.learning_rate
 
-        traces = []
-        for x in inputs:
-            _ = self.forward_with_trace(x)
-            if len(self.activation_trace) >= 1:
-                traces.append(self.activation_trace[-1].copy())
+        for x in inputs[:4]:
+            self.forward_with_trace(x)
 
-        if len(traces) < 2:
+        if len(self.activation_trace) < 2:
             return
-
-        acts = np.array(traces)
+        acts = np.array(self.activation_trace[-4:])
         if acts.ndim != 2 or acts.shape[0] < 2:
             return
 
-        avg_post = np.mean(acts, axis=0)
-        avg_pre = np.mean(acts, axis=0)
-
-        for i in range(n):
-            for j in range(n):
-                if i == j:
-                    continue
-                dw = eta * (avg_post[i] * avg_pre[j] - avg_post[i] ** 2 * g.adjacency[i, j])
-                g.adjacency[i, j] += float(dw)
-                g.adjacency[i, j] = float(np.clip(g.adjacency[i, j], -3.0, 3.0))
+        a = np.mean(acts, axis=0)
+        outer_aa = np.outer(a, a)
+        decay = g.adjacency * np.outer(a ** 2, np.ones(n))
+        delta = eta * (outer_aa - decay)
+        np.fill_diagonal(delta, 0)
+        g.adjacency += delta.astype(np.float32)
+        np.clip(g.adjacency, -3.0, 3.0, out=g.adjacency)
 
     def mutate(self, rng: np.random.Generator) -> 'DAGNetwork':
         new_g = Genome(
@@ -91,6 +70,7 @@ class DAGNetwork:
             adjacency=self.genome.adjacency.copy(),
             activations=self.genome.activations.copy(),
             innovations=self.genome.innovations.copy(),
+            biases=self.genome.biases.copy(),
             learning_rate=self.genome.learning_rate,
             mutation_rate=self.genome.mutation_rate,
             age=self.genome.age + 1,
@@ -110,6 +90,8 @@ class DAGNetwork:
             idx = rng.integers(0, new_g.neuron_count)
             from dex.core.activations import random_activation
             new_g.activations[idx] = random_activation(rng)
+
+        new_g.biases += rng.standard_normal(new_g.neuron_count).astype(np.float32) * mr * 0.05
 
         if rng.random() < mr * 0.2 and new_g.neuron_count < MAX_NEURONS:
             self._grow_neuron(new_g, rng)
@@ -151,6 +133,7 @@ class DAGNetwork:
         g.adjacency = new_adj
         g.activations.append(random_activation(rng))
         g.innovations.append(next_innovation_id())
+        g.biases = np.append(g.biases, np.float32(0.0))
         g.neuron_count = new_n
 
     @staticmethod
@@ -160,4 +143,5 @@ class DAGNetwork:
         g.adjacency = np.delete(np.delete(g.adjacency, idx, axis=0), idx, axis=1)
         g.activations.pop(idx)
         g.innovations.pop(idx)
+        g.biases = np.delete(g.biases, idx)
         g.neuron_count -= 1
