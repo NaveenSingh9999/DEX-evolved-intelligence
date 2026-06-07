@@ -2,10 +2,10 @@ import math
 import numpy as np
 from fastapi import APIRouter
 from pydantic import BaseModel
+from dex.evolution.curriculum import _CHAR_MAP
 
 router = APIRouter(prefix='/api/chat', tags=['chat'])
 
-_CHAR_MAP = {c: i / 64.0 for i, c in enumerate('abcdefghijklmnopqrstuvwxyz ,.!\'?')}
 _REV_MAP = {v: k for k, v in _CHAR_MAP.items()}
 _VOCAB = list(_CHAR_MAP.keys())
 

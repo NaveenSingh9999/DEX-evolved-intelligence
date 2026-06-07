@@ -20,7 +20,7 @@ class TrainingPipeline:
         self.fitness_log: list[float] = []
         self.diversity_coeff = 0.05
         self.last_replay_gen = -5
-        self.gd_steps_per_gen = 15
+        self.gd_steps_per_gen = 25
 
     def step(self, iterations: int = 10):
         for _ in range(iterations):
